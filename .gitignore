@@ -128,3 +128,4 @@ dmypy.json
 
 # Output
 *.xlsx
+temp.png
