@@ -1,6 +1,7 @@
 
 import discord
 from discord.activity import CustomActivity
+from discord.errors import HTTPException
 import pandas as pd
 import urllib.request
 from PIL import Image
@@ -39,7 +40,8 @@ async def on_message(message):
 		rows = []
 		# TODO: Use history filters instead of weird custom timezone stuff
 		posts = await analysisChannel.history(limit=10000).flatten()
-		print('got history')
+		print('I found {0} posts. I am compiling them now.'.format(len(posts)))
+		await message.channel.send('I found {0} posts. I am compiling them now.'.format(len(posts)))
 		posts.reverse()
 		for elem in posts:
 			if 'twitter' in elem.content:
@@ -69,9 +71,9 @@ async def on_message(message):
 							retweets = '?'
 							embeded_images = ''
 							if len(embeds) > 0 and len(embeds[0].image) > 0:
-								print('text: ' + elem.embeds[0].description)
+								#print('text: ' + elem.embeds[0].description)
 								embeded_images = [embed.image.url for embed in embeds]
-								print('images: ' + str(embeded_images))
+								#print('images: ' + str(embeded_images))
 
 								# TODO: Replace with Twitter API instead of using Embeds
 								for embed in embeds:
@@ -82,9 +84,9 @@ async def on_message(message):
 											elif field.name == 'Retweets':
 												retweets = field.value
 
-							else:
-								print('text: ' + elem.embeds[0].description)
-							print('')
+							#else:
+								#print('text: ' + elem.embeds[0].description)
+							#print('')
 
 							row = {
 								'link': '=HYPERLINK("' + tw + '")',
@@ -152,9 +154,15 @@ async def on_message(message):
 
 			writer.save()
 
-			await message.channel.send("Here are the posted tweets!", file=discord.File(filepath))
+			try:
+				await message.channel.send("Here are the posted tweets!", file=discord.File(filepath))
+			except HTTPException as e:
+				await message.channel.send("The spreadsheet was too big to upload to this channel! Contact <@169651896359976961> for help!")
 		else:
 			await message.channel.send("That's weird. There were no tweets posted last month... :thinking:")
+
+		print('done processing tweets')
+		print()
 
 botChoice = open('config/bot_choice.cfg').read()
 tokenFile = open('config/' + botChoice.strip())
