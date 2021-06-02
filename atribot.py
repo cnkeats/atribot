@@ -32,12 +32,12 @@ async def on_message(message):
 		await message.channel.send('Hello!')
 
 	if message.content.startswith('!export'):
-		channel = client.get_channel(849156812376637493)
+		analysisChannel = client.get_channel(799195020808552478)
 		await message.channel.send("Working...")
 
 		rows = []
 		# TODO: Use history filters instead of weird custom timezone stuff
-		posts = await channel.history(limit=10000).flatten()
+		posts = await analysisChannel.history(limit=10000).flatten()
 		posts.reverse()
 		for elem in posts:
 			if 'twitter' in elem.content:
@@ -60,7 +60,7 @@ async def on_message(message):
 							duplicateIndex = i
 
 					if duplicateIndex != -1:
-						row['duplicate posts'] += 1
+						row['duplicates'] += 1
 					else:
 						likes = '?'
 						retweets = '?'
@@ -93,7 +93,7 @@ async def on_message(message):
 							'retweets' : retweets,
 							'first poster': elem.author.name + '#' + elem.author.discriminator,
 							'discTimestamp' : elem.created_at,
-							'duplicate posts': 0
+							'duplicates': 0
 						}
 						rows.append(row)
 
@@ -137,14 +137,15 @@ async def on_message(message):
 			worksheet.set_column(0, 0, 438/7, format)
 			worksheet.set_column(1, 1, 372/7, format)
 			worksheet.set_column(2, 2, 125/7, format)
-			worksheet.set_column(3, 4, 80/7, format)
-			worksheet.set_column(5, 6, 95/7, format)
+			worksheet.set_column(3, 4, 50/7, format)
+			worksheet.set_column(5, 6, 75/7, format)
 			worksheet.set_column(7, 7, 120/7, format)
-			worksheet.set_column(8, 9, 133/7, format)
+			worksheet.set_column(8, 8, 133/7, format)
+			worksheet.set_column(9, 9, 100/7, format)
 
 			writer.save()
 
-			await message.channel.send("Here is your export!", file=discord.File(filepath))
+			await message.channel.send("Here are the posted tweets!", file=discord.File(filepath))
 		else:
 			await message.channel.send("That's weird. There were no tweets posted last month... :thinking:")
 
