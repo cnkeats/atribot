@@ -1,1 +1,1 @@
-atribot
+This is a bot built for the streamer [Atrioc](https://www.twitch.tv/atrioc) to automate some tedious manual work.

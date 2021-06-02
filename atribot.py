@@ -10,6 +10,7 @@ from urllib.request import urlopen
 import datetime
 import pytz
 import re
+import configparser
 
 client = discord.Client()
 
@@ -164,8 +165,13 @@ async def on_message(message):
 		print('done processing tweets')
 		print()
 
-botChoice = open('config/bot_choice.cfg').read()
-tokenFile = open('config/' + botChoice.strip())
-token = tokenFile.read()
+config = configparser.RawConfigParser()
+configPath = './config/config.cfg'
+config.read(configPath)
+
+tokenFile = config.get('Atribot', 'bot')
+analysisChannel = config.get('Atribot', 'channel')
+
+token = open('config/{0}'.format(tokenFile)).read()
 
 client.run(token)

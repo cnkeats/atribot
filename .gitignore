@@ -124,7 +124,7 @@ dmypy.json
 .pyre/
 
 # Discord config
-config/bot_choice.cfg
+config/*.cfg
 *.token
 
 # Output
