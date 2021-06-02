@@ -33,11 +33,13 @@ async def on_message(message):
 
 	if message.content.startswith('!export'):
 		analysisChannel = client.get_channel(799195020808552478)
+		print('Working...')
 		await message.channel.send("Working...")
 
 		rows = []
 		# TODO: Use history filters instead of weird custom timezone stuff
 		posts = await analysisChannel.history(limit=10000).flatten()
+		print('got history')
 		posts.reverse()
 		for elem in posts:
 			if 'twitter' in elem.content:
@@ -62,40 +64,41 @@ async def on_message(message):
 					if duplicateIndex != -1:
 						row['duplicates'] += 1
 					else:
-						likes = '?'
-						retweets = '?'
-						embeded_images = ''
-						if len(embeds[0].image) > 0:
-							print('text: ' + elem.embeds[0].description)
-							embeded_images = [embed.image.url for embed in embeds]
-							print('images: ' + str(embeded_images))
+						if len(embeds) > 0:
+							likes = '?'
+							retweets = '?'
+							embeded_images = ''
+							if len(embeds) > 0 and len(embeds[0].image) > 0:
+								print('text: ' + elem.embeds[0].description)
+								embeded_images = [embed.image.url for embed in embeds]
+								print('images: ' + str(embeded_images))
 
-							# TODO: Replace with Twitter API instead of using Embeds
-							for embed in embeds:
-								if len(embed.fields) > 0:
-									for field in embed.fields:
-										if field.name == 'Likes':
-											likes = field.value
-										elif field.name == 'Retweets':
-											retweets = field.value
+								# TODO: Replace with Twitter API instead of using Embeds
+								for embed in embeds:
+									if len(embed.fields) > 0:
+										for field in embed.fields:
+											if field.name == 'Likes':
+												likes = field.value
+											elif field.name == 'Retweets':
+												retweets = field.value
 
-						else:
-							print('text: ' + elem.embeds[0].description)
-						print('')
+							else:
+								print('text: ' + elem.embeds[0].description)
+							print('')
 
-						row = {
-							'link': '=HYPERLINK("' + tw + '")',
-							'text content': elem.embeds[0].description[0:50] + ' ...',
-							'image content': embeded_images,
-							'author': '-',
-							'date': '-',
-							'likes' : likes,
-							'retweets' : retweets,
-							'first poster': elem.author.name + '#' + elem.author.discriminator,
-							'discTimestamp' : elem.created_at,
-							'duplicates': 0
-						}
-						rows.append(row)
+							row = {
+								'link': '=HYPERLINK("' + tw + '")',
+								'text content': elem.embeds[0].description[0:50] + ' ...',
+								'image content': embeded_images,
+								'author': '-',
+								'date': '-',
+								'likes' : likes,
+								'retweets' : retweets,
+								'first poster': elem.author.name + '#' + elem.author.discriminator,
+								'discTimestamp' : elem.created_at,
+								'duplicates': 0
+							}
+							rows.append(row)
 
 
 		df = pd.DataFrame.from_dict(rows, orient='columns')
@@ -117,22 +120,26 @@ async def on_message(message):
 			for key, item in df['image content'].iteritems():
 				if (len(item) > 0):
 					url = item[0]
-					image_data = BytesIO(urlopen(url).read())
+					try:
+						image_data = BytesIO(urlopen(url).read())
+						
 
-					urllib.request.urlretrieve(url, "temp.png")
+						urllib.request.urlretrieve(url, "temp.png")
 
-					with Image.open("temp.png") as img:
-						width_100 = img.width
-						height_100 = img.height
+						with Image.open("temp.png") as img:
+							width_100 = img.width
+							height_100 = img.height
 
-					cell_width = 125
-					cell_height = 200
+						cell_width = 125
+						cell_height = 200
 
-					scale_value = cell_width / width_100
+						scale_value = cell_width / width_100
 
-					worksheet.set_row(key+1, (scale_value * height_100 * .75))
-					worksheet.write_string('C' + str(key+2), '')
-					worksheet.insert_image('C' + str(key+2), url, {'image_data': image_data, 'x_scale' : scale_value, 'y_scale' : scale_value})
+						worksheet.set_row(key+1, (scale_value * height_100 * .75))
+						worksheet.write_string('C' + str(key+2), '')
+						worksheet.insert_image('C' + str(key+2), url, {'image_data': image_data, 'x_scale' : scale_value, 'y_scale' : scale_value})
+					except Exception as e:
+						print(e)
 
 			worksheet.set_column(0, 0, 438/7, format)
 			worksheet.set_column(1, 1, 372/7, format)
