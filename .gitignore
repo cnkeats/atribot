@@ -123,9 +123,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Discord token
+# Discord config
+config/bot_choice.cfg
 *.token
 
 # Output
+output/*
 *.xlsx
 temp.png

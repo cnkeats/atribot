@@ -2,11 +2,12 @@
 import discord
 from discord.activity import CustomActivity
 import pandas as pd
-import xlsxwriter
 import urllib.request
 from PIL import Image
 from io import BytesIO
 from urllib.request import urlopen
+import datetime
+import pytz
 import re
 
 client = discord.Client()
@@ -15,11 +16,6 @@ client = discord.Client()
 async def on_ready():
 	print('We have logged in as {0.user}'.format(client))
 	channel = client.get_channel(849156812376637493)
-	#print(channel.name)
-
-	customActivity = CustomActivity("Stealing Quack's job")
-	
-	await client.change_presence(activity=discord.Game(name="a game"))
 	await client.change_presence(activity=discord.Game(name="with your heart <3"))
 
 @client.event
@@ -27,150 +23,133 @@ async def on_message(message):
 	channel = message.channel
 	if message.author == client.user:
 		return
-	
+
 	# Ignore users that aren't Krohnos (for now)
 	if message.author.id != 169651896359976961:
 		return
 
-	if message.content.startswith('!sleep'):
-		bot.toggleSleep()
-		await message.channel.send('sleeping: %s' % bot.sleeping)
-		return
-
-	if bot.sleeping:
-		return
-
-	if message.content.startswith('$hello'):
+	if message.content.startswith('!hello'):
 		await message.channel.send('Hello!')
-	
+
 	if message.content.startswith('!export'):
+		channel = client.get_channel(849156812376637493)
+		await message.channel.send("Working...")
 
 		rows = []
-		posts = await channel.history().flatten()
+		# TODO: Use history filters instead of weird custom timezone stuff
+		posts = await channel.history(limit=10000).flatten()
 		posts.reverse()
 		for elem in posts:
 			if 'twitter' in elem.content:
 
-				embeds = elem.embeds
+				pacific = pytz.timezone('US/Pacific')
+				today = datetime.datetime.today()
+				first = today.replace(day=1)
+				lastMonth = datetime.datetime(datetime.date.today().year, first.month-1, 1)
+				first = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-				tw = re.search("(?P<url>https?://[^\s]+)", elem.content).group("url")
+				if elem.created_at.astimezone(pacific) > lastMonth.astimezone(pacific) and elem.created_at.astimezone(pacific) < first.astimezone(pacific):
 				
-				duplicateIndex = -1
-				for i, row in enumerate(rows):
-					if row['link'] == '=HYPERLINK("' + tw + '")':
-						duplicateIndex = i
+					embeds = elem.embeds
 
-				if duplicateIndex != -1:
-					row['duplicate posts'] += 1
-				else:
-					likes = '?'
-					retweets = '?'
-					embeded_images = ''
-					if len(embeds[0].image) > 0:
-						print('text: ' + elem.embeds[0].description)
-						embeded_images = [embed.image.url for embed in embeds]
-						print('images: ' + str(embeded_images))
+					tw = re.search("(?P<url>https?://[^\s]+)", elem.content).group("url")
 
-						for embed in embeds:
-							if len(embed.fields) > 0:
-								for field in embed.fields:
-									if field.name == 'Likes':
-										likes = field.value
-										#print('there are this many likes: ' + str(likes))
-									elif field.name == 'Retweets':
-										retweets = field.value
-							
+					duplicateIndex = -1
+					for i, row in enumerate(rows):
+						if row['link'] == '=HYPERLINK("' + tw + '")':
+							duplicateIndex = i
+
+					if duplicateIndex != -1:
+						row['duplicate posts'] += 1
 					else:
-						print('text: ' + elem.embeds[0].description)
-					print('')
+						likes = '?'
+						retweets = '?'
+						embeded_images = ''
+						if len(embeds[0].image) > 0:
+							print('text: ' + elem.embeds[0].description)
+							embeded_images = [embed.image.url for embed in embeds]
+							print('images: ' + str(embeded_images))
 
-					row = {
-						'link': '=HYPERLINK("' + tw + '")',
-						'text content': elem.embeds[0].description[0:50] + ' ...',
-						'image content': embeded_images,
-						'author': '-',
-						'date': '-',
-						'likes' : likes,
-						'retweets' : retweets,
-						'first poster': elem.author.name + '#' + elem.author.discriminator,
-						'discTimestamp' : elem.created_at,
-						'duplicate posts': 0
-					}
-					rows.append(row)
+							# TODO: Replace with Twitter API instead of using Embeds
+							for embed in embeds:
+								if len(embed.fields) > 0:
+									for field in embed.fields:
+										if field.name == 'Likes':
+											likes = field.value
+										elif field.name == 'Retweets':
+											retweets = field.value
+
+						else:
+							print('text: ' + elem.embeds[0].description)
+						print('')
+
+						row = {
+							'link': '=HYPERLINK("' + tw + '")',
+							'text content': elem.embeds[0].description[0:50] + ' ...',
+							'image content': embeded_images,
+							'author': '-',
+							'date': '-',
+							'likes' : likes,
+							'retweets' : retweets,
+							'first poster': elem.author.name + '#' + elem.author.discriminator,
+							'discTimestamp' : elem.created_at,
+							'duplicate posts': 0
+						}
+						rows.append(row)
 
 
 		df = pd.DataFrame.from_dict(rows, orient='columns')
 		#print(df)
 
-		filepath = 'best_tweets.xlsx'
+		filepath = 'output/best_tweets_' + 'jan feb mar apr may jun jul aug sep oct mov dec'.split()[first.month-2] + '.xlsx'
 		writer = pd.ExcelWriter(filepath, engine='xlsxwriter')
 		df.to_excel(writer, index=False, sheet_name='Best Tweets')
 		workbook = writer.book
 		worksheet = writer.sheets['Best Tweets']
-		worksheet.autofilter(0, 0, df.shape[0], df.shape[1]-1)
 
-		format = workbook.add_format()
-		format.set_align('vcenter')
+		if (df.shape[1] > 0):
+			worksheet.autofilter(0, 0, df.shape[0], df.shape[1]-1)
+
+			format = workbook.add_format()
+			format.set_align('vcenter')
 
 
-		for key, item in df['image content'].iteritems():
-			#print(item)
-			if (len(item) > 0):
-				#print(item[0])
+			for key, item in df['image content'].iteritems():
+				if (len(item) > 0):
+					url = item[0]
+					image_data = BytesIO(urlopen(url).read())
 
-				url = item[0]
-				image_data = BytesIO(urlopen(url).read())
+					urllib.request.urlretrieve(url, "temp.png")
 
-				url = url #'https://upload.wikimedia.org/wikipedia/en/thumb/4/43/Ipswich_Town.svg/255px-Ipswich_Town.svg.png'
+					with Image.open("temp.png") as img:
+						width_100 = img.width
+						height_100 = img.height
 
-				urllib.request.urlretrieve(url, "temp.png")
+					cell_width = 125
+					cell_height = 200
 
-				with Image.open("temp.png") as img:
-					width_100 = img.width
-					height_100 = img.height
-				
-				cell_width = 125
-				cell_height = 200
+					scale_value = cell_width / width_100
 
-				scale_value = cell_width / width_100
+					worksheet.set_row(key+1, (scale_value * height_100 * .75))
+					worksheet.write_string('C' + str(key+2), '')
+					worksheet.insert_image('C' + str(key+2), url, {'image_data': image_data, 'x_scale' : scale_value, 'y_scale' : scale_value})
 
-				#print('image width: ' + str(img.height))
-				#print('image height: ' + str(img.height))
-				#print('scale value: ' + str(scale_value))
-				#print(scale_value * height_100)
+			worksheet.set_column(0, 0, 438/7, format)
+			worksheet.set_column(1, 1, 372/7, format)
+			worksheet.set_column(2, 2, 125/7, format)
+			worksheet.set_column(3, 4, 80/7, format)
+			worksheet.set_column(5, 6, 95/7, format)
+			worksheet.set_column(7, 7, 120/7, format)
+			worksheet.set_column(8, 9, 133/7, format)
 
-				
-				worksheet.set_row(key+1, (scale_value * height_100 * .75))
-				worksheet.write_string('C' + str(key+2), '')
-				worksheet.insert_image('C' + str(key+2), url, {'image_data': image_data, 'x_scale' : scale_value, 'y_scale' : scale_value})
-				
-		
-		#for i in range(0, 10):
-			#worksheet.set_row(i, None, format)
-		worksheet.set_column(0, 0, 438/7, format)
-		worksheet.set_column(1, 1, 372/7, format)
-		worksheet.set_column(2, 2, 125/7, format)
-		worksheet.set_column(3, 4, 80/7, format)
-		worksheet.set_column(5, 6, 95/7, format)
-		worksheet.set_column(7, 7, 120/7, format)
-		worksheet.set_column(8, 9, 133/7, format)
+			writer.save()
 
-		writer.save()
+			await message.channel.send("Here is your export!", file=discord.File(filepath))
+		else:
+			await message.channel.send("That's weird. There were no tweets posted last month... :thinking:")
 
-		await message.channel.send("Here is your export!", file=discord.File('best_tweets.xlsx'))
-
-class Bot(object):
-	def __init__(self):
-		self.sleeping = False
-
-	def toggleSleep(self):
-		self.sleeping = not self.sleeping
-
-bot = Bot()
-
-print('\n\n\n\n\n\n\n\n')
-
-tokenFile = open('config/atribot.token')
+botChoice = open('config/bot_choice.cfg').read()
+tokenFile = open('config/' + botChoice)
 token = tokenFile.read()
 
 client.run(token)
