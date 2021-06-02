@@ -11,30 +11,33 @@ import datetime
 import pytz
 import re
 import configparser
+import sys
 
 client = discord.Client()
 
 @client.event
 async def on_ready():
 	print('We have logged in as {0.user}'.format(client))
-	channel = client.get_channel(849156812376637493)
-	await client.change_presence(activity=discord.Game(name="with your heart <3"))
+	await client.change_presence(activity=discord.Game(name=config.get('Atribot', 'game')))
 
 @client.event
 async def on_message(message):
-	channel = message.channel
 	if message.author == client.user:
 		return
 
-	# Ignore users that aren't Krohnos (for now)
-	if message.author.id != 169651896359976961:
+	# Ignore users that aren't Admins
+	if message.author.id not in admins:
 		return
+
+	if message.content == '!kill':
+		await message.channel.send('Bye :(')
+		sys.exit(1)
 
 	if message.content.startswith('!hello'):
 		await message.channel.send('Hello!')
 
 	if message.content.startswith('!export'):
-		analysisChannel = client.get_channel(799195020808552478)
+		analysisChannel = client.get_channel(analysisChannelId)
 		print('Working...')
 		await message.channel.send("Working...")
 
@@ -68,8 +71,8 @@ async def on_message(message):
 						row['duplicates'] += 1
 					else:
 						if len(embeds) > 0:
-							likes = '?'
-							retweets = '?'
+							likes = -1
+							retweets = -1
 							embeded_images = ''
 							if len(embeds) > 0 and len(embeds[0].image) > 0:
 								#print('text: ' + elem.embeds[0].description)
@@ -170,7 +173,8 @@ configPath = './config/config.cfg'
 config.read(configPath)
 
 tokenFile = config.get('Atribot', 'bot')
-analysisChannel = config.get('Atribot', 'channel')
+analysisChannelId = config.get('Atribot', 'channel')
+admins = [int(i) for i in config.get('Atribot', 'admins').split(', ')]
 
 token = open('config/{0}'.format(tokenFile)).read()
 
