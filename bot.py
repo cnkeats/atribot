@@ -75,7 +75,6 @@ async def on_message(message):
         ]
 
         requestedMonths = [index+1 for index, month in enumerate(months) if month in message.content.lower()]
-        print('requested {0}'.format(requestedMonths))
 
         if len(requestedMonths) != 1:
             print('More than one month requested.')
@@ -83,8 +82,9 @@ async def on_message(message):
             return
 
         month = requestedMonths[0]
-        firstOfMonth = datetime.datetime(datetime.datetime.today().year, month, 1)
-        firstOfNextMonth = datetime.datetime(firstOfMonth.year, firstOfMonth.month+1, firstOfMonth.day)
+        # A hack to get into pacific time - this will break by an hour during daylight savings time
+        firstOfMonth = datetime.datetime(datetime.datetime.today().year, month, 1) + datetime.timedelta(hours=8)
+        firstOfNextMonth = datetime.datetime(firstOfMonth.year, firstOfMonth.month+1, firstOfMonth.day) + datetime.timedelta(hours=8)
 
 
         analysisChannel = client.get_channel(int(client.analysisChannelId))
@@ -98,6 +98,7 @@ async def on_message(message):
         posts = await analysisChannel.history(limit=10000, after=firstOfMonth, before=firstOfNextMonth, oldest_first=True).flatten()
         print('I found {0} posts. I am extracting relevant ones now.'.format(len(posts)))
         await message.channel.send('I found {0} posts. I am extracting relevant ones now.'.format(len(posts)))
+        print('Looking for tweets after: {0}'.format(firstOfMonth))
 
         for elem in posts:
 
@@ -158,9 +159,7 @@ async def on_message(message):
         df.to_excel(writer, index=False, sheet_name='Best Tweets')
         workbook = writer.book
         worksheet = writer.sheets['Best Tweets']
-
-        print(df)
-
+        
         if (df.shape[1] > 0):
             worksheet.autofilter(0, 0, df.shape[0], df.shape[1]-1)
 
@@ -176,6 +175,7 @@ async def on_message(message):
 
             for key, item in df['image content'].iteritems():
                 if (len(item) > 0):
+                    worksheet.write_string('C' + str(key+2), '')
                     url = item[0]
                     try:
                         image_data = BytesIO(urlopen(url).read())
@@ -193,7 +193,6 @@ async def on_message(message):
                         scale_value = cell_width / width_100
 
                         worksheet.set_row(key+1, (scale_value * height_100 * .75))
-                        worksheet.write_string('C' + str(key+2), '')
                         worksheet.insert_image('C' + str(key+2), url, {'image_data': image_data, 'x_scale' : scale_value, 'y_scale' : scale_value})
                     except Exception as e:
                         print('There was an issue processing image data for {0} - {1}'.format(url, e))
