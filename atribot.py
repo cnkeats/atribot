@@ -49,7 +49,7 @@ async def on_message(message):
 				first = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 				if elem.created_at.astimezone(pacific) > lastMonth.astimezone(pacific) and elem.created_at.astimezone(pacific) < first.astimezone(pacific):
-				
+
 					embeds = elem.embeds
 
 					tw = re.search("(?P<url>https?://[^\s]+)", elem.content).group("url")
@@ -149,7 +149,7 @@ async def on_message(message):
 			await message.channel.send("That's weird. There were no tweets posted last month... :thinking:")
 
 botChoice = open('config/bot_choice.cfg').read()
-tokenFile = open('config/' + botChoice)
+tokenFile = open('config/' + botChoice.strip())
 token = tokenFile.read()
 
 client.run(token)
