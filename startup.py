@@ -12,6 +12,12 @@ import pytz
 import re
 import configparser
 import sys
-import startup
+import bot
 
-startup.start()
+
+def start():
+    config = configparser.RawConfigParser()
+    configPath = './config/config.cfg'
+    config.read(configPath)
+
+    bot.run(config)
