@@ -8,16 +8,16 @@ from PIL import Image
 from io import BytesIO
 from urllib.request import urlopen
 import datetime
-import pytz
 import re
-import configparser
 import sys
-import textwrap
+import requests
+import json
 
 def run(config):
     print('running')
     tokenFile = config.get('Atribot', 'bot')
     token = open('config/{0}'.format(tokenFile)).read()
+    client.twitterToken = open('config/twitter.token').read()
 
     client.analysisChannelId = config.get('Atribot', 'channel')
     client.admins = [int(i) for i in config.get('Atribot', 'admins').split(', ')]
@@ -88,6 +88,12 @@ async def on_message(message):
 
 
         analysisChannel = client.get_channel(int(client.analysisChannelId))
+
+        if (analysisChannel == None):
+            print("I don't have permission to view the requested channel.")
+            await message.channel.send("I don't have permission to view the requested channel.")
+            return
+
         print('Analysis channel #{0} - id.{1}'.format(analysisChannel.name, client.analysisChannelId))
         await message.channel.send('Analyzing <#{0}>'.format(analysisChannel.id))
         print('Working...')
@@ -102,57 +108,73 @@ async def on_message(message):
 
         for elem in posts:
 
-            if 'twitter' in elem.content:
-                embeds = elem.embeds
+            if tweetURL := re.search('(.*)http(?:s)?:\/\/(?:www\.)?twitter\.com\/([a-zA-Z0-9_]+)/status/([0-9]*).*', elem.content, re.IGNORECASE):
+                author = tweetURL.group(2)
+                tweet_id = tweetURL.group(3)
 
-                tw = re.search("(?P<url>https?://[^\s]+)", elem.content).group("url")
+                
+                url = 'https://api.twitter.com/2/tweets/{0}?tweet.fields=public_metrics,created_at,author_id'.format(tweet_id)
+                headers = { 'Authorization' : 'Bearer {0}'.format(client.twitterToken) }
+                tweetResponse = requests.get(url, headers=headers)
+                tweetData = json.loads(tweetResponse.text)
+
+                url = 'https://api.twitter.com/2/users/{0}?user.fields=verified'.format(tweetData['data']['author_id'])
+                authorResponse = requests.get(url, headers=headers)
+                authorData = json.loads(authorResponse.text)
+
+                author_handle = authorData['data']['username']
+                author_name = authorData['data']['name']
+                author_verified = authorData['data']['verified']
+
+                tweet_text = tweetData['data']['text']
+                tweet_likes = tweetData['data']['public_metrics']['like_count']
+                tweet_retweets = tweetData['data']['public_metrics']['retweet_count']
+                tweet_quotes = tweetData['data']['public_metrics']['quote_count']
+                tweet_replies = tweetData['data']['public_metrics']['reply_count']
+                tweet_date = tweetData['data']['created_at']
+
+                tweetURL = 'https://twitter.com/{0}/status/{1}'.format(author_handle, tweet_id)
+
+                embeds = elem.embeds
 
                 duplicateIndex = -1
                 for i, row in enumerate(rows):
-                    if row['link'] == tw:
+                    if row['link'] == tweetURL:
                         duplicateIndex = i
 
                 if duplicateIndex != -1:
                     row['duplicates'] += 1
                 else:
                     if len(embeds) > 0:
-                        likes = -1
-                        retweets = -1
                         embeded_images = ''
                         if len(embeds) > 0 and len(embeds[0].image) > 0:
                             #print('text: ' + elem.embeds[0].description)
                             embeded_images = [embed.image.url for embed in embeds]
                             #print('images: ' + str(embeded_images))
 
-                            # TODO: Replace with Twitter API instead of using Embeds
-                            for embed in embeds:
-                                if len(embed.fields) > 0:
-                                    for field in embed.fields:
-                                        if field.name == 'Likes':
-                                            likes = field.value
-                                        elif field.name == 'Retweets':
-                                            retweets = field.value
-
                         #else:
                             #print('text: ' + elem.embeds[0].description)
                         #print('')
 
-                        row = {
-                            'link': tw,
-                            'text content': elem.embeds[0].description,
-                            'image content': embeded_images,
-                            'author': '-',
-                            'date': '-',
-                            'likes' : likes,
-                            'retweets' : retweets,
-                            'first poster': elem.author.name + '#' + elem.author.discriminator,
-                            'discTimestamp' : elem.created_at,
-                            'duplicates': 0
-                        }
-                        rows.append(row)
+                    row = {
+                        'link': tweetURL,
+                        'text content': tweet_text,
+                        'image content': embeded_images,
+                        'author': '{0} (@{1} {2})'.format(author_name, author_handle, '✓' if author_verified else ''),
+                        'date': tweet_date,
+                        'quotetweets' : tweet_quotes,
+                        'replies' : tweet_replies,
+                        'first poster': elem.author.name + '#' + elem.author.discriminator,
+                        'discTimestamp' : elem.created_at,
+                        'duplicates': 0,
+                        'likes' : tweet_likes,
+                        'retweets' : tweet_retweets
+                    }
+                    rows.append(row)
+                    #print(row)
+                    #return
 
         df = pd.DataFrame.from_dict(rows, orient='columns')
-        #print(df)
 
         filepath = 'output/best_tweets_' + months[firstOfMonth.month-1] + '.xlsx'
         writer = pd.ExcelWriter(filepath, engine='xlsxwriter')
