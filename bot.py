@@ -109,16 +109,15 @@ async def on_message(message):
         for elem in posts:
 
             if tweetURL := re.search('(.*)http(?:s)?:\/\/(?:www\.)?twitter\.com\/([a-zA-Z0-9_]+)/status/([0-9]*).*', elem.content, re.IGNORECASE):
-                author = tweetURL.group(2)
                 tweet_id = tweetURL.group(3)
-
                 
                 url = 'https://api.twitter.com/2/tweets/{0}?tweet.fields=public_metrics,created_at,author_id'.format(tweet_id)
                 headers = { 'Authorization' : 'Bearer {0}'.format(client.twitterToken) }
                 tweetResponse = requests.get(url, headers=headers)
                 tweetData = json.loads(tweetResponse.text)
 
-                print (tweetData)
+                if ('errors' in tweetData):
+                    continue
 
                 url = 'https://api.twitter.com/2/users/{0}?user.fields=verified'.format(tweetData['data']['author_id'])
                 authorResponse = requests.get(url, headers=headers)
