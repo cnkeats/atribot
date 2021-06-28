@@ -117,8 +117,6 @@ async def on_message(message):
                 headers = { 'Authorization' : 'Bearer {0}'.format(client.twitterToken) }
                 tweetResponse = requests.get(url, headers=headers)
                 tweetData = json.loads(tweetResponse.text)
-                print(tweetData)
-                return
 
                 url = 'https://api.twitter.com/2/users/{0}?user.fields=verified'.format(tweetData['data']['author_id'])
                 authorResponse = requests.get(url, headers=headers)
