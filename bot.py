@@ -12,6 +12,7 @@ import re
 import sys
 import requests
 import json
+import time
 
 def run(config):
 	print('running')
@@ -106,10 +107,16 @@ async def on_message(message):
 		await message.channel.send('I found {0} posts. I am extracting relevant ones now.'.format(len(posts)))
 		print('Looking for tweets after: {0}'.format(firstOfMonth))
 
+		count = 0
 		for elem in posts:
-
+			count += 1
+			print(count)
+			
 			if tweetURL := re.search('(.*)http(?:s)?:\/\/(?:www\.)?twitter\.com\/([a-zA-Z0-9_]+)/status/([0-9]*).*', elem.content, re.IGNORECASE):
 				tweet_id = tweetURL.group(3)
+
+				# sleep because of stupid rate limiting
+				time.sleep(4)
 
 				url = 'https://api.twitter.com/2/tweets/{0}?tweet.fields=public_metrics,created_at,author_id'.format(tweet_id)
 				headers = { 'Authorization' : 'Bearer {0}'.format(client.twitterToken) }
@@ -117,6 +124,10 @@ async def on_message(message):
 				tweetData = json.loads(tweetResponse.text)
 
 				if ('errors' in tweetData):
+					continue
+				if ('data' not in tweetData):
+					print('data missing?')
+					print(tweetData)
 					continue
 
 				url = 'https://api.twitter.com/2/users/{0}?user.fields=verified'.format(tweetData['data']['author_id'])
